@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  canvas { position:fixed; left:0; top:0; width:100%; height:100%; display:block; background:#000; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+(function () {
+  var canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d');
+  var W = 0, H = 0, DPR = 1;
+
+  function resize() {
+    var w = Math.floor(canvas.clientWidth || window.innerWidth || document.documentElement.clientWidth);
+    var h = Math.floor(canvas.clientHeight || window.innerHeight || document.documentElement.clientHeight);
+    if (!w || !h) return false;
+    var d = Math.min(window.devicePixelRatio || 1, 2);
+    if (w === W && h === H && d === DPR) return true;
+    W = w; H = h; DPR = d;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    return true;
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function () { setTimeout(resize, 150); });
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(document.documentElement);
+  resize();
+
+  var particles = [];
+  var hue = 0;
+  var lastInput = 0;
+
+  function Particle(x, y) {
+    this.x = x; this.y = y;
+    this.size = Math.random() * 10 + 2;
+    this.speedX = Math.random() * 4 - 2;
+    this.speedY = Math.random() * 4 - 2;
+    this.color = 'hsl(' + hue + ',100%,50%)';
+  }
+  Particle.prototype.update = function () {
+    this.x += this.speedX; this.y += this.speedY;
+    if (this.size > 0.1) this.size -= 0.15;
+  };
+  Particle.prototype.draw = function () {
+    ctx.fillStyle = this.color;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+  };
+
+  function emit(x, y, n) {
+    for (var i = 0; i < n; i++) particles.push(new Particle(x, y));
+    if (particles.length > 1500) particles.splice(0, particles.length - 1500);
+  }
+
+  function onPointer(e) {
+    var pts = e.touches && e.touches.length ? e.touches : [e];
+    for (var i = 0; i < pts.length; i++) {
+      var r = canvas.getBoundingClientRect();
+      emit(pts[i].clientX - r.left, pts[i].clientY - r.top, 5);
+    }
+    lastInput = Date.now();
+  }
+  var opt = { passive: false };
+  ['touchstart', 'touchmove'].forEach(function (t) {
+    window.addEventListener(t, function (e) { e.preventDefault(); onPointer(e); }, opt);
+  });
+  ['mousedown', 'mousemove'].forEach(function (t) { window.addEventListener(t, onPointer); });
+
+  var t0 = Date.now();
+  function frame() {
+    if (resize()) {
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      ctx.fillRect(0, 0, W, H);
+
+      // idle demo: screen kabhi blank nahi rahegi
+      if (Date.now() - lastInput > 1200) {
+        var t = (Date.now() - t0) / 1000;
+        emit(W / 2 + Math.sin(t * 1.3) * W * 0.3, H / 2 + Math.sin(t * 1.9 + 1) * H * 0.25, 4);
+      }
+
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        p.update(); p.draw();
+        if (p.size <= 0.2) { particles.splice(i, 1); i--; }
+      }
+      hue = (hue + 5) % 360;
+    }
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>
